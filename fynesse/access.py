@@ -1,4 +1,4 @@
-from config import *
+from fynesse.config import *
 from pymysql import connect
 from pymysql.connections import Connection
 import pandas as pd
