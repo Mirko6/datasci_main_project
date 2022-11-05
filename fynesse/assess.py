@@ -1,4 +1,4 @@
-from config import *
+from fynesse.config import *
 
 import access
 
