@@ -1,4 +1,3 @@
-from fynesse.config import *
 from pymysql import connect
 from pymysql.connections import Connection
 import pandas as pd
@@ -85,20 +84,32 @@ def upload_datasets(
   ):
     num_fetched_rows = []
     num_uploaded_rows = []
+    data_folder = "data/"
     for year in range(year_from, year_to_excl):
       for part in [1, 2]:
         print(f"fetching data from year: {year}, part: {part}")
         df = get_data(year, part)
         num_fetched_rows.append(len(df))
         filename = f"price_paid_data_year_{year}_part_{part}.csv"
-        df.to_csv(filename, header=False, index=False)
-        df.sample(frac=sample_portion).to_csv("sample_" + filename, header=False, index=False)
+        df.to_csv(data_folder + filename, header=False, index=False)
+        df.sample(frac=sample_portion).to_csv(data_folder + "sample_" + filename, header=False, index=False)
         print(f"uploading the data")
         num_uploaded_rows.append(
-            upload_csv_to_aws(conn, table_name, filename)
+            upload_csv_to_aws(conn, table_name, data_folder + filename)
         )
-        upload_csv_to_aws(conn, sample_table_name, "sample_" + filename)
+        upload_csv_to_aws(conn, sample_table_name, data_folder + "sample_" + filename)
     return num_fetched_rows, num_uploaded_rows
+
+
+def upload_2022_dataset(conn, table_name="pp_data", sample_table_name="pp_data_sample", sample_portion=0.01):
+  url = "http://prod.publicdata.landregistry.gov.uk.s3-website-eu-west-1.amazonaws.com/pp-2022.csv"
+  df = pd.read_csv(url, header=None)
+  num_fetched = len(df)
+  df.to_csv("data/price_paid_data_year_2022.csv", header=False, index=False)
+  df.sample(frac=sample_portion).to_csv("data/sample_price_paid_data_year_2022.csv", header=False, index=False)
+  num_uploaded = upload_csv_to_aws(conn, table_name, "data/price_paid_data_year_2022.csv")
+  upload_csv_to_aws(conn, sample_table_name, "data/sample_price_paid_data_year_2022.csv")
+  return num_fetched, num_uploaded
 
 
 def select_top(conn: Connection, table_name: str,  n: int = 5):
@@ -108,6 +119,12 @@ def select_top(conn: Connection, table_name: str,  n: int = 5):
     rows = cur.fetchall()
     column_names = [i[0] for i in cur.description]
     return rows, column_names
+
+
+def select_top_to_df(conn: Connection, table_name: str,  n: int = 5):
+  rows, column_names = select_top(conn, table_name, n)
+  df = pd.DataFrame.from_records(rows, columns=column_names)
+  return df
 
 
 def custom_simple_select(conn, table, what_to_select="COUNT(*)"):
